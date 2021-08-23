@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head></head>
+<body>
+<script>
+const clear = value => value.replace(/^\s*([\s\S]*?)\s*$/, function(m, v) { return v; });
+const splitter = value => new RegExp("\\s*" + value + "\\s*(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)(?![^\\(\\[\\{]*[\\}\\]\\)])", "g");
+const lines = (value, tab = 0) => value.split(splitter("\\n(?=\\s{" + tab + "}\\w+)")).filter(Boolean).map(value => clear(value));
+const line = (value, tab = 0) => {
+    let output = new String(), keyword = new String(), variable = new String(), operator = new String();
+    const stack = new Array(), element = value.split(splitter("\\s+")), size = element.length;
+    for (let position = 0; position < size; position++) {
+        const token = element[position];
+        if (position == 0) keyword = token;
+        if (keyword == "remark") {
+            if (position > 0) stack.push(token);
+            output = ["//", stack.join(" ")].join(" ");
+        } else if (keyword == "print") {
+            if (position > 0) stack.push(token);
+            output = ["console.log", "(", stack.join(" "), ")"].join("") + ";";
+        } else if (keyword == "let") {
+            if (position == 1) variable = token;
+            if (position == 2) operator = (token == "be" ? "=" : token);
+            if (position > 2) stack.push(token);
+            output = ["var", variable, operator, stack.join(" ")].join(" ") + ";";
+        } else if (keyword == "update") {
+            if (position == 1) variable = token;
+            if (position == 2) operator = (token == "to" ? "=" : token);
+            if (position > 2) stack.push(token);
+            output = [variable, operator, stack.join(" ")].join(" ") + ";";
+        } else if (keyword == "if" || keyword == "else") {
+            if (position == 0) stack.push(token);
+            if (position == 1 && token == "if") stack.push(token);
+            if (position == size - 1) {
+                var item = lines(value, tab += 4); keyword = stack.join(" ");
+                var array = item.splice(1).map(v => (" ").repeat(tab) + line(v, tab));
+                var condition = [keyword, "(" + clear(item.shift().replace(keyword, new String())) + ")"].join(" ");
+                output = [keyword == "else" ? keyword : condition,  "{\n" + array.join("\n") + "\n" + (" ").repeat(tab - 4) + "}"].join(" ");
+            }
+        }
+    }
+    return output.toString();
+};
+const transpile = value => new Function(lines(value).map(v => line(v, 0)).join("\n"));
+const execute = value => transpile(value)();
+const source = `
+let x be 2
+let y be 8
+update x to 4
+
+if x > y
+    print x
+else if x < y
+    print y
+else
+    print 0
+
+remark print x
+`;
+execute(source);
+</script>
+</body>
+</html>
